@@ -12,7 +12,9 @@ import {
   Clock,
   ChevronRight,
   LogOut,
-  LayoutDashboard
+  LayoutDashboard,
+  ArrowUpRight,
+  BarChart3
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -20,6 +22,22 @@ export default function Dashboard() {
   const [citasHoy, setCitasHoy] = useState([]);
   const [cargando, setCargando] = useState(true);
   const router = useRouter();
+
+  // Lógica para determinar el estado de la cita (Tiempo real)
+  const getEstadoCita = (horaCita) => {
+    if (!horaCita) return 'pendiente';
+    const ahora = new Date();
+    const [horas, minutos] = horaCita.split(':');
+    const fechaCita = new Date();
+    fechaCita.setHours(parseInt(horas), parseInt(minutos), 0);
+
+    const diferenciaMs = fechaCita - ahora;
+    const diferenciaMin = diferenciaMs / (1000 * 60);
+
+    if (diferenciaMin < 0) return 'pasada';
+    if (diferenciaMin <= 60) return 'proxima';
+    return 'pendiente';
+  };
 
   useEffect(() => {
     async function inicializarDashboard() {
@@ -30,24 +48,33 @@ export default function Dashboard() {
           return;
         }
 
-        // 1. CARGAR ALERTAS DE STOCK (Detecta críticos y agotados)
+        // 1. CARGAR ALERTAS (STOCK + CADUCIDAD)
         const { data: productos, error: prodError } = await supabase
           .from('productos')
           .select('*');
         
         if (prodError) throw prodError;
+        
         if (productos) {
-          const criticos = productos.filter(p => p.stock_actual <= p.stock_minimo || p.stock_actual === 0);
+          const hoy = new Date();
+          const criticos = productos.filter(p => {
+            // Revisar Stock bajo o agotado
+            const stockCritico = p.stock_actual <= p.stock_minimo;
+            
+            // Revisar Caducidad (15 días de margen)
+            let porCaducar = false;
+            if (p.fecha_caducidad) {
+              const fechaVence = new Date(p.fecha_caducidad);
+              const diferenciaDias = (fechaVence - hoy) / (1000 * 60 * 60 * 24);
+              porCaducar = diferenciaDias <= 15 && diferenciaDias >= 0;
+            }
+            return stockCritico || porCaducar;
+          });
           setAlertas(criticos);
         }
 
-        // 2. CARGAR CITAS DE HOY (Solución definitiva de fecha)
-        // 'sv-SE' garantiza el formato YYYY-MM-DD que usa tu tabla citas
+        // 2. CARGAR CITAS DE HOY
         const hoyLocal = new Date().toLocaleDateString('sv-SE');
-
-        console.log("🔍 Diagnóstico Dashboard:");
-        console.log("Fecha local detectada:", hoyLocal);
-
         const { data: citas, error: citasError } = await supabase
           .from('citas')
           .select('*')
@@ -55,8 +82,6 @@ export default function Dashboard() {
           .order('hora', { ascending: true });
 
         if (citasError) throw citasError;
-        
-        console.log("Citas encontradas en DB:", citas?.length || 0);
         if (citas) setCitasHoy(citas);
 
       } catch (err) {
@@ -77,11 +102,11 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-black text-white flex overflow-hidden font-sans">
       
-      {/* SIDEBAR COMPACTO */}
+      {/* SIDEBAR */}
       <aside className="w-60 bg-zinc-950 border-r border-zinc-900 p-6 flex flex-col fixed h-full z-20">
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="bg-red-600 w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shadow-lg shadow-red-900/40 text-white">IB</div>
-          <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] italic">INK BLACK</h2>
+          <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] italic text-white">INK BLACK</h2>
         </div>
         
         <nav className="space-y-1 flex-1">
@@ -94,7 +119,12 @@ export default function Dashboard() {
           <Link href="/inventario" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-900 text-zinc-500 font-bold hover:text-zinc-200 text-xs transition-all">
             <Package size={16} /> Inventario
           </Link>
-        </nav>
+          {/* 1. REPORTES PRIMERO */}
+          <Link href="/reportes" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-900 text-zinc-500 font-bold hover:text-zinc-200 text-xs transition-all group">
+          <BarChart3 size={16} className="group-hover:text-red-600 transition-colors" /> 
+           Reportes
+          </Link>
+          </nav>
 
         <button onClick={handleLogout} className="flex items-center gap-3 p-3 text-zinc-600 hover:text-red-500 font-black uppercase text-[9px] tracking-widest transition-all border-t border-zinc-900 pt-6">
           <LogOut size={14} /> Cerrar Sesión
@@ -107,7 +137,7 @@ export default function Dashboard() {
         <header className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-black italic tracking-tighter uppercase leading-none text-white">DASHBOARD</h1>
-            <p className="text-zinc-600 font-black uppercase text-[9px] tracking-[0.3em] mt-1">Ink Black Studio</p>
+            <p className="text-zinc-600 font-black uppercase text-[9px] tracking-[0.3em] mt-1 italic">Estudio InkBlack</p>
           </div>
           <div className="flex items-center gap-2 bg-zinc-900/50 px-3 py-1.5 rounded-full border border-zinc-800">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
@@ -136,70 +166,100 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* SECCIÓN ALERTAS */}
+          {/* SECCIÓN ALERTAS (STOCK + CADUCIDAD) */}
           <section>
             <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em] flex items-center gap-2 mb-4">
               <AlertCircle size={12} className="text-red-600" /> Alertas de Pánico
             </h2>
             <div className="space-y-2">
               {cargando ? (
-                <p className="text-zinc-700 animate-pulse font-bold text-[10px]">Sincronizando...</p>
+                <p className="text-zinc-700 animate-pulse font-bold text-[10px] uppercase">Sincronizando...</p>
               ) : alertas.length > 0 ? (
-                alertas.map((item) => (
-                  <div key={item.id} className={`border p-4 rounded-2xl flex items-center justify-between group transition-all ${item.stock_actual === 0 ? 'bg-red-950/20 border-red-600 animate-pulse' : 'bg-zinc-900/40 border-zinc-800 hover:border-red-600/30'}`}>
-                    <div>
-                      <p className="text-red-600 font-black uppercase text-[8px] tracking-widest mb-0.5 italic">
-                        {item.stock_actual === 0 ? '¡PRODUCTO AGOTADO!' : '¡CUIDADO! STOCK CRÍTICO'}
-                      </p>
-                      <p className="text-zinc-200 font-bold text-sm tracking-tight">
-                        Quedan <span className={item.stock_actual === 0 ? 'text-red-500 font-black' : 'text-white'}>{item.stock_actual}</span> en <span className="text-white uppercase text-xs font-black">{item.nombre}</span>
-                      </p>
+                alertas.map((item) => {
+                  const hoy = new Date();
+                  const fechaVence = item.fecha_caducidad ? new Date(item.fecha_caducidad) : null;
+                  const esCaducidad = fechaVence && ((fechaVence - hoy) / (1000 * 60 * 60 * 24)) <= 15;
+                  const esAgotado = item.stock_actual === 0;
+
+                  return (
+                    <div key={item.id} className={`border p-4 rounded-2xl flex items-center justify-between group transition-all 
+                      ${(esAgotado || esCaducidad) ? 'bg-red-950/20 border-red-600 animate-pulse' : 'bg-zinc-900/40 border-zinc-800'}`}>
+                      <div>
+                        <p className="text-red-600 font-black uppercase text-[8px] tracking-widest mb-0.5 italic flex items-center gap-2">
+                          {esCaducidad ? <><Clock size={10} /> ¡PRÓXIMO A CADUCAR!</> : esAgotado ? '¡PRODUCTO AGOTADO!' : '¡CUIDADO! STOCK CRÍTICO'}
+                        </p>
+                        <p className="text-zinc-200 font-bold text-sm tracking-tight">
+                          {esCaducidad ? (
+                            <>El insumo <span className="text-white uppercase font-black">{item.nombre}</span> vence el {item.fecha_caducidad}</>
+                          ) : (
+                            <>Quedan <span className="text-white font-black">{item.stock_actual}</span> en <span className="text-white uppercase text-xs font-black">{item.nombre}</span></>
+                          )}
+                        </p>
+                      </div>
+                      <AlertCircle size={16} className="text-red-600" />
                     </div>
-                    <AlertCircle size={16} className="text-red-600" />
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="p-8 border border-dashed border-zinc-900 rounded-3xl text-center">
-                  <p className="text-zinc-700 font-black text-[9px] uppercase tracking-widest">Inventario al día</p>
+                  <p className="text-zinc-700 font-black text-[9px] uppercase tracking-widest">Todo bajo control</p>
                 </div>
               )}
             </div>
           </section>
 
-          {/* SECCIÓN AGENDA HOY */}
+          {/* SECCIÓN AGENDA HOY (CON ALERTAS DE TIEMPO) */}
           <section>
-            <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em] flex items-center gap-2 mb-4">
-              <Calendar size={12} /> Agenda Hoy
+            <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em] flex justify-between items-center mb-4">
+              <span className="flex items-center gap-2"><Calendar size={12} /> Agenda Hoy</span>
+              <span className="bg-zinc-900 px-2 py-0.5 rounded text-[8px] text-white italic font-black">{citasHoy.length} SESIONES</span>
             </h2>
-            <div className="bg-zinc-900/30 border border-zinc-800 rounded-3xl overflow-hidden backdrop-blur-sm">
+            
+            <div className="bg-zinc-900/30 border border-zinc-800 rounded-[2.5rem] overflow-hidden backdrop-blur-sm min-h-[300px] flex flex-col">
               {cargando ? (
-                <p className="p-8 text-zinc-700 animate-pulse font-bold text-[10px] text-center uppercase">Cargando sesiones...</p>
+                <div className="flex-1 flex items-center justify-center p-8">
+                  <p className="text-zinc-700 animate-pulse font-bold text-[10px] uppercase">Cargando...</p>
+                </div>
               ) : citasHoy.length > 0 ? (
-                citasHoy.map((cita) => (
-                  <div key={cita.id} className="p-4 flex items-center justify-between hover:bg-zinc-800/40 transition-all border-b border-zinc-800/50 last:border-0 group">
-                    <div className="flex items-center gap-4">
-                      <div className="bg-zinc-800 group-hover:bg-red-600 transition-all w-10 h-10 rounded-2xl flex items-center justify-center font-black text-[10px] text-zinc-400 group-hover:text-white">
-                        {cita.hora?.slice(0, 5)}
+                <div className="flex-1">
+                  {citasHoy.map((cita) => {
+                    const estado = getEstadoCita(cita.hora);
+                    return (
+                      <div key={cita.id} className={`p-5 flex items-center justify-between hover:bg-zinc-800/40 transition-all border-b border-zinc-800/50 last:border-0 group ${estado === 'pasada' ? 'opacity-30' : ''}`}>
+                        <div className="flex items-center gap-4">
+                          <div className={`transition-all w-12 h-12 rounded-2xl flex flex-col items-center justify-center shadow-lg 
+                            ${estado === 'proxima' ? 'bg-red-600 animate-bounce text-white' : 'bg-zinc-800 group-hover:bg-zinc-700'}`}>
+                            <span className="text-[10px] font-black leading-none">{cita.hora?.slice(0, 5)}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-black text-sm uppercase tracking-tighter group-hover:text-red-500 transition-colors text-white">{cita.cliente}</h4>
+                              {estado === 'proxima' && <span className="bg-red-600 text-[7px] font-black px-1.5 py-0.5 rounded animate-pulse text-white">¡YA LLEGA!</span>}
+                            </div>
+                            <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest">
+                              <p className="text-zinc-500">{cita.estilo || 'Estilo Libre'}</p>
+                              <span className="text-zinc-800">•</span>
+                              <p className="text-red-600 italic">{cita.kit_nombre}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronRight size={16} className="text-zinc-800 group-hover:text-white transition-all" />
                       </div>
-                      <div>
-                        <h4 className="font-black text-sm uppercase tracking-tighter group-hover:text-red-500 transition-colors text-white">{cita.cliente}</h4>
-                        <p className="text-[8px] text-zinc-500 font-black uppercase tracking-widest">{cita.estilo || 'Estilo Libre'}</p>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="text-zinc-700 group-hover:text-white transition-all" />
-                  </div>
-                ))
+                    );
+                  })}
+                </div>
               ) : (
-                <div className="p-12 text-center">
-                  <p className="text-zinc-700 font-black text-[9px] uppercase tracking-widest italic">No hay sesiones para hoy</p>
+                <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-zinc-700 font-black text-[9px] uppercase tracking-widest italic">
+                  <Clock size={32} className="text-zinc-900 mb-4" />
+                  Sin sesiones hoy
                 </div>
               )}
-              <Link href="/agenda" className="block w-full p-3 text-[8px] font-black text-zinc-500 hover:text-white text-center uppercase tracking-[0.4em] transition-all bg-black/40 border-t border-zinc-800">
-                Ver completa
+              
+              <Link href="/agenda" className="block w-full p-4 text-[8px] font-black text-zinc-500 hover:text-white text-center uppercase tracking-[0.4em] transition-all bg-black/40 border-t border-zinc-800 group">
+                Ver Agenda Completa <ArrowUpRight size={10} className="inline ml-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
               </Link>
             </div>
           </section>
-
         </div>
       </main>
     </div>

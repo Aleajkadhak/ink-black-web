@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { Zap, ChevronLeft, LayoutDashboard, Calendar, Clock, Box, Package } from 'lucide-react';
+import { Zap, LayoutDashboard, Calendar, Box } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NuevaSesion() {
@@ -10,7 +10,6 @@ export default function NuevaSesion() {
   const [loading, setLoading] = useState(false);
   const [productos, setProductos] = useState([]);
   
-  // Lista de nombres de kits para el selector (basado en tu SQL)
   const kitsDisponibles = ['Kit Estándar', 'Kit Micro', 'Kit Realismo'];
 
   const [form, setForm] = useState({
@@ -30,7 +29,7 @@ export default function NuevaSesion() {
   }, []);
 
   const handleRegistrar = async () => {
-    // Validaciones básicas
+    // 1. Validaciones de campos vacíos
     if (!form.cliente || !form.fecha || !form.hora) {
       return alert("Por favor, completa Nombre, Fecha y Hora.");
     }
@@ -38,7 +37,7 @@ export default function NuevaSesion() {
     setLoading(true);
 
     try {
-      // 1. OBTENER LA "RECETA" DEL KIT DESDE KITS_INSUMOS
+      // 2. Obtener la receta del kit seleccionado
       const { data: receta, error: errReceta } = await supabase
         .from('kits_insumos')
         .select('*')
@@ -46,13 +45,28 @@ export default function NuevaSesion() {
 
       if (errReceta) throw new Error("No se pudo cargar la receta del kit.");
 
-      // 2. DESCONTAR CADA INSUMO DEL ALMACÉN
+      // 3. VALIDACIÓN DE STOCK: Revisar si hay suficiente material ANTES de agendar
+      if (receta && receta.length > 0) {
+        for (const item of receta) {
+          const productoEnAlmacen = productos.find(p => p.nombre === item.insumo_nombre);
+          
+          // Si el producto no existe en inventario o el stock es menor a lo que pide el kit
+          if (!productoEnAlmacen || productoEnAlmacen.stock_actual < item.cantidad_a_descontar) {
+            alert(`🚫 STOCK INSUFICIENTE: No hay suficiente "${item.insumo_nombre}" para el ${form.kit_nombre}.`);
+            setLoading(false);
+            return; // Detiene la ejecución por completo
+          }
+        }
+      }
+
+      // 4. DESCONTAR MATERIAL (Solo llega aquí si la validación anterior pasó)
       if (receta && receta.length > 0) {
         for (const item of receta) {
           const productoEnAlmacen = productos.find(p => p.nombre === item.insumo_nombre);
           
           if (productoEnAlmacen) {
-            const nuevoStock = productoEnAlmacen.stock_actual - item.cantidad_a_descontar;
+            // Math.max asegura que por seguridad nunca baje de 0
+            const nuevoStock = Math.max(0, productoEnAlmacen.stock_actual - item.cantidad_a_descontar);
             
             const { error: errUpdate } = await supabase
               .from('productos')
@@ -64,16 +78,16 @@ export default function NuevaSesion() {
         }
       }
 
-      // 3. INSERTAR LA CITA EN LA TABLA CITAS
+      // 5. INSERTAR LA CITA
       const { error: errCita } = await supabase.from('citas').insert([
         { 
           cliente: form.cliente,
           estilo: form.estilo,
           fecha: form.fecha,
-          hora: form.hora, // Formato HH:mm:ss que acepta Supabase
+          hora: form.hora,
           artista: 'Alexandra',
           estado: 'Confirmada',
-          kit_nombre: form.kit_nombre // Asegúrate de haber hecho el ALTER TABLE para esta columna
+          kit_nombre: form.kit_nombre
         }
       ]);
 
@@ -91,12 +105,12 @@ export default function NuevaSesion() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex overflow-hidden">
+    <div className="min-h-screen bg-black text-white flex overflow-hidden font-sans">
       
       {/* SIDEBAR */}
       <aside className="w-60 bg-zinc-950 border-r border-zinc-900 p-6 flex flex-col fixed h-full z-20">
         <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="bg-red-600 w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shadow-lg shadow-red-900/40">IB</div>
+          <div className="bg-red-600 w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shadow-lg shadow-red-900/40 text-white">IB</div>
           <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] italic">Ink Black</h2>
         </div>
         <nav className="space-y-1 flex-1">
@@ -116,7 +130,7 @@ export default function NuevaSesion() {
       <main className="flex-1 ml-60 p-12 bg-black overflow-y-auto">
         <header className="mb-10">
           <h1 className="text-5xl font-black italic uppercase tracking-tighter text-red-600 leading-none">Nueva Sesión</h1>
-          <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.4em] mt-3 italic">Registro de Consumo y Agendado Directo</p>
+          <p className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.4em] mt-3 italic text-white">Registro de Consumo y Agendado Directo</p>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -126,26 +140,42 @@ export default function NuevaSesion() {
             <div className="bg-zinc-900/30 border border-zinc-800 p-8 rounded-[40px] space-y-5 shadow-2xl">
               <div className="space-y-2">
                 <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">Nombre del Cliente</label>
-                <input type="text" placeholder="Nombre del cliente" className="w-full bg-black border border-zinc-800 p-4 rounded-2xl outline-none focus:border-red-600 font-bold text-lg transition-all" 
-                  value={form.cliente} onChange={e => setForm({...form, cliente: e.target.value})} />
+                <input 
+                  type="text" 
+                  placeholder="Nombre del cliente" 
+                  className="w-full bg-black border border-zinc-800 p-4 rounded-2xl outline-none focus:border-red-600 font-bold text-lg transition-all text-white" 
+                  value={form.cliente} 
+                  onChange={e => setForm({...form, cliente: e.target.value})} 
+                />
               </div>
 
               <div className="space-y-2">
                 <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">Estilo de Tatuaje</label>
-                <input type="text" placeholder="Ej. Blackwork / Realismo" className="w-full bg-black border border-zinc-800 p-4 rounded-2xl outline-none focus:border-red-600 font-bold transition-all" 
-                  value={form.estilo} onChange={e => setForm({...form, estilo: e.target.value})} />
+                <input 
+                  type="text" 
+                  placeholder="Ej. Blackwork / Realismo" 
+                  className="w-full bg-black border border-zinc-800 p-4 rounded-2xl outline-none focus:border-red-600 font-bold transition-all text-white" 
+                  value={form.estilo} 
+                  onChange={e => setForm({...form, estilo: e.target.value})} 
+                />
               </div>
               
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">Fecha de Sesión</label>
-                  <input type="date" className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-bold text-zinc-400 outline-none" 
-                    onChange={e => setForm({...form, fecha: e.target.value})} />
+                  <input 
+                    type="date" 
+                    className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-bold text-zinc-400 outline-none" 
+                    onChange={e => setForm({...form, fecha: e.target.value})} 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">Hora de Inicio</label>
-                  <input type="time" className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-bold text-zinc-400 outline-none" 
-                    onChange={e => setForm({...form, hora: e.target.value})} />
+                  <input 
+                    type="time" 
+                    className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-bold text-zinc-400 outline-none" 
+                    onChange={e => setForm({...form, hora: e.target.value})} 
+                  />
                 </div>
               </div>
             </div>
@@ -164,7 +194,7 @@ export default function NuevaSesion() {
                   >
                     <div>
                       <p className={`font-black text-sm uppercase italic ${form.kit_nombre === kit ? 'text-white' : 'text-zinc-600'}`}>{kit}</p>
-                      <p className="text-[8px] text-zinc-700 mt-0.5 font-bold uppercase">Insumos Automáticos</p>
+                      <p className="text-[8px] text-zinc-700 mt-0.5 font-bold uppercase tracking-widest">Insumos Automáticos</p>
                     </div>
                     {form.kit_nombre === kit && <Zap size={16} className="text-red-600 fill-red-600" />}
                   </button>
@@ -176,7 +206,7 @@ export default function NuevaSesion() {
                 onClick={handleRegistrar} 
                 className="w-full bg-red-600 text-white font-black py-6 rounded-[2rem] mt-10 uppercase text-[11px] tracking-[0.3em] hover:bg-red-700 transition-all shadow-xl shadow-red-900/20 active:scale-95 disabled:opacity-50"
               >
-                {loading ? 'Sincronizando Almacén...' : 'Finalizar y Agendar'}
+                {loading ? 'Validando Stock...' : 'Finalizar y Agendar'}
               </button>
             </div>
           </div>

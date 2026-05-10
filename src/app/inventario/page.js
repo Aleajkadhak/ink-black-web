@@ -2,7 +2,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
-  Search, ChevronLeft, Plus, X, Save, ShoppingCart, Clock, Package, LogOut, Edit3, Filter 
+  Search, ChevronLeft, Plus, X, Save, ShoppingCart, Clock, 
+  Package, LogOut, Edit3, Filter, 
+  LayoutDashboard, Calendar // <--- ESTOS DOS FALTABAN
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -99,30 +101,30 @@ export default function Inventario() {
   return (
     <div className="min-h-screen bg-black text-white flex">
       
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-zinc-900 border-r border-zinc-800 p-6 flex flex-col fixed h-full shadow-2xl">
-        <div className="flex flex-col items-center mb-10">
-          <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center mb-2 shadow-lg shadow-red-900/40">
-            <span className="font-black text-[10px]">IB</span>
-          </div>
-          <h2 className="text-[10px] font-black text-zinc-500 tracking-[0.3em] uppercase italic">Ink Black</h2>
-        </div>
-        
-        <nav className="space-y-4 flex-1">
-          <Link href="/" className="flex items-center gap-3 p-3 rounded-xl text-zinc-500 hover:text-white font-bold transition-all">
-            <Clock size={20} /> Inicio
-          </Link>
-          <Link href="/inventario" className="flex items-center gap-3 p-3 rounded-xl bg-zinc-800 text-white font-bold border border-zinc-700 transition-all">
-            <Package size={20} className="text-red-600" /> Almacén
-          </Link>
-        </nav>
+      {/* SIDEBAR CORREGIDO */}
+<aside className="w-60 bg-zinc-950 border-r border-zinc-900 p-6 flex flex-col fixed h-full z-20">
+  <div className="flex items-center gap-3 mb-10 px-2">
+    <div className="bg-red-600 w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shadow-lg shadow-red-900/40 text-white">IB</div>
+    <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] italic text-white">INK BLACK</h2>
+  </div>
+  
+  <nav className="space-y-1 flex-1">
+    <Link href="/" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-900 text-zinc-500 font-bold text-xs transition-all">
+      <LayoutDashboard size={16} /> Inicio
+    </Link>
+    <Link href="/agenda" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-900 text-zinc-500 font-bold hover:text-zinc-200 text-xs transition-all">
+      <Calendar size={16} /> Agenda
+    </Link>
+    {/* Aquí el botón activo de Inventario con el icono Package */}
+    <Link href="/inventario" className="flex items-center gap-3 p-3 rounded-xl bg-zinc-900 text-white font-bold text-xs border border-zinc-800 transition-all">
+      <Package size={16} className="text-red-600" /> Inventario
+    </Link>
+  </nav>
 
-        <div className="pt-6 border-t border-zinc-800">
-          <button onClick={handleLogout} className="flex items-center gap-3 w-full p-3 rounded-xl text-zinc-500 hover:text-red-500 font-black uppercase text-[10px] tracking-widest transition-all">
-            <LogOut size={18} /> Cerrar Sesión
-          </button>
-        </div>
-      </aside>
+  <button onClick={handleLogout} className="flex items-center gap-3 p-3 text-zinc-600 hover:text-red-500 font-black uppercase text-[9px] tracking-widest transition-all border-t border-zinc-900 pt-6">
+    <LogOut size={14} /> Cerrar Sesión
+  </button>
+</aside>
 
       {/* CONTENIDO PRINCIPAL */}
       <main className="flex-1 ml-64 p-10">
