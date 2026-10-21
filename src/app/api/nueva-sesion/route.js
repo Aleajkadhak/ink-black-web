@@ -55,7 +55,7 @@ export async function POST(request) {
       estilo: estilo || 'Estilo Libre',
       fecha,
       hora,
-      artista: 'Ale',
+      artista: 'Kike Kikazo',
       estado: 'Confirmada',
       kit_nombre
     };

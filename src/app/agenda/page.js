@@ -1,36 +1,29 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { 
   Calendar, 
   Clock, 
   Package, 
   LayoutDashboard, 
   Box,
-  Trash2,
-  LogOut
+  Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Agenda() {
   const [citas, setCitas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => { 
-    if (!localStorage.getItem('token')) {
-      router.push('/login');
-      return;
-    }
     fetchCitas(); 
-  }, [router]);
+  }, []);
 
   async function fetchCitas() {
+    setLoading(true);
     try {
-      setLoading(true);
       const res = await fetch('/api/agenda');
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setCitas(data);
       }
     } catch (error) {
@@ -39,11 +32,6 @@ export default function Agenda() {
       setLoading(false);
     }
   }
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.push('/login');
-  };
 
   const cancelarCita = async (id) => {
     const confirmar = confirm("¿Estás segura de que quieres cancelar esta sesión?");
@@ -55,14 +43,14 @@ export default function Agenda() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })
       });
-
+      
       if (res.ok) {
-        fetchCitas(); // Refrescar la lista automáticamente
+        fetchCitas(); // Refrescar la lista
       } else {
-        alert("Error al cancelar la cita.");
+        alert("Error al cancelar la cita en la base de datos.");
       }
     } catch (error) {
-      alert("Error de conexión: " + error.message);
+      alert("Error de red al intentar cancelar.");
     }
   };
 
@@ -72,8 +60,8 @@ export default function Agenda() {
       {/* SIDEBAR */}
       <aside className="w-60 bg-zinc-950 border-r border-zinc-900 p-6 flex flex-col fixed h-full z-20">
         <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="bg-red-600 w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm text-white">IB</div>
-          <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] italic text-white">INK BLACK</h2>
+          <div className="bg-red-600 w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm">IB</div>
+          <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] italic">Ink Black</h2>
         </div>
         <nav className="space-y-1 flex-1">
           <Link href="/" className="flex items-center gap-3 p-3 rounded-xl text-zinc-500 hover:bg-zinc-900 hover:text-white font-bold text-xs transition-all">
@@ -86,16 +74,13 @@ export default function Agenda() {
             <Box size={16}/> Inventario
           </Link>
         </nav>
-        <button onClick={handleLogout} className="flex items-center gap-3 p-3 text-zinc-600 hover:text-red-500 font-black uppercase text-[9px] tracking-widest transition-all border-t border-zinc-900 pt-6">
-          <LogOut size={14} /> Cerrar Sesión
-        </button>
       </aside>
 
       {/* CONTENIDO PRINCIPAL */}
-      <main className="flex-1 ml-60 p-12 bg-black min-h-screen">
+      <main className="flex-1 ml-60 p-12 bg-black">
         <header className="mb-10 flex justify-between items-center">
           <div>
-            <h1 className="text-5xl font-black italic uppercase tracking-tighter leading-none text-white">Próximas Sesiones</h1>
+            <h1 className="text-5xl font-black italic uppercase tracking-tighter leading-none">Próximas Sesiones</h1>
             <p className="text-red-600 text-[10px] font-black uppercase tracking-[0.4em] mt-3">Control de Citas y Estados</p>
           </div>
         </header>
@@ -118,16 +103,16 @@ export default function Agenda() {
                   <div className="text-center min-w-[100px]">
                     <div className="flex items-center justify-center gap-2 text-red-600 mb-1">
                       <Clock size={14} />
-                      <span className="text-2xl font-black italic tracking-tighter text-white">{cita.hora ? cita.hora.slice(0, 5) : '--:--'}</span>
+                      <span className="text-2xl font-black italic tracking-tighter">{cita.hora.slice(0, 5)}</span>
                     </div>
-                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{cita.fecha ? cita.fecha.split('T')[0] : '---'}</p>
+                    <p className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{cita.fecha}</p>
                   </div>
 
                   <div className="h-12 w-[1px] bg-zinc-800"></div>
 
                   {/* INFO CLIENTE */}
                   <div>
-                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-none mb-1 text-white">
+                    <h3 className="text-2xl font-black uppercase tracking-tighter leading-none mb-1">
                       {cita.cliente}
                     </h3>
                     <div className="flex items-center gap-3">
