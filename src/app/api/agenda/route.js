@@ -9,10 +9,7 @@ export async function GET() {
     const client = await clientPromise;
     const db = client.db('inkblackDB');
     
-    // Traer citas ordenadas por fecha (las más próximas primero)
     const citas = await db.collection('citas').find({}).sort({ fecha: 1, hora: 1 }).toArray();
-    
-    // Formatear el _id para el frontend
     const formateadas = citas.map(c => ({ ...c, id: c._id.toString() }));
     
     return NextResponse.json(formateadas, { status: 200 });
@@ -27,7 +24,6 @@ export async function PATCH(request) {
     const client = await clientPromise;
     const db = client.db('inkblackDB');
     
-    // Actualizar el estado a 'Cancelada'
     await db.collection('citas').updateOne(
       { _id: new ObjectId(id) },
       { $set: { estado: 'Cancelada' } }
