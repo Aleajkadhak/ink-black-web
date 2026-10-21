@@ -5,14 +5,11 @@ import { useRouter } from 'next/navigation';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState(''); // Para el código de verificación
-  const [step, setStep] = useState('login'); // 'login' o 'otp'
   const [cargando, setCargando] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   
   const router = useRouter();
 
-  // --- PASO 1: Login con correo y contraseña ---
   const handleLogin = async (e) => {
     e.preventDefault();
     setCargando(true);
@@ -33,9 +30,9 @@ export default function Login() {
         return;
       }
 
-      // Login exitoso
+      // Login exitoso: guardamos el token y mandamos al dashboard
       localStorage.setItem('token', data.token);
-      router.push('/'); // Cambia '/' por la ruta de tu dashboard si es diferente
+      router.push('/'); 
 
     } catch (error) {
       setErrorMsg("Error de conexión con el servidor");
@@ -59,92 +56,45 @@ export default function Login() {
         </div>
 
         {/* FORMULARIO DE LOGIN */}
-        {step === 'login' && (
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label className="block text-zinc-400 text-sm mb-2 font-medium tracking-wide">CORREO ELECTRÓNICO</label>
-              <input 
-                type="email" 
-                className="w-full bg-black/50 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-700"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Ej. Tilin@inkblack.com"
-                required
-              />
-            </div>
+        <form onSubmit={handleLogin} className="space-y-6">
+          <div>
+            <label className="block text-zinc-400 text-sm mb-2 font-medium tracking-wide">CORREO ELECTRÓNICO</label>
+            <input 
+              type="email" 
+              className="w-full bg-black/50 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-700"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Ej. admin@inkblack.com"
+              required
+            />
+          </div>
 
-            <div>
-              <label className="block text-zinc-400 text-sm mb-2 font-medium tracking-wide">CONTRASEÑA</label>
-              <input 
-                type="password" 
-                className="w-full bg-black/50 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-700"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-zinc-400 text-sm mb-2 font-medium tracking-wide">CONTRASEÑA</label>
+            <input 
+              type="password" 
+              className="w-full bg-black/50 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-600 outline-none transition-all placeholder:text-zinc-700"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </div>
 
-            {errorMsg && (
-              <p className="text-red-500 text-[10px] font-black uppercase text-center tracking-widest bg-red-500/10 py-2 rounded border border-red-500/20">
-                {errorMsg}
-              </p>
-            )}
-
-            <button 
-              type="submit"
-              disabled={cargando}
-              className="w-full bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-black py-4 rounded-lg transition-all shadow-lg shadow-red-900/40 uppercase tracking-widest disabled:opacity-50"
-            >
-              {cargando ? 'Verificando...' : 'Entrar al Estudio'}
-            </button>
-          </form>
-        )}
-
-        {/* FORMULARIO DE OTP */}
-        {step === 'otp' && (
-          <form onSubmit={handleVerifyOtp} className="space-y-6">
-            <p className="text-zinc-400 text-sm text-center">
-              Hemos enviado un código de 6 dígitos a <br/>
-              <span className="text-white font-bold">{email}</span>
+          {errorMsg && (
+            <p className="text-red-500 text-[10px] font-black uppercase text-center tracking-widest bg-red-500/10 py-2 rounded border border-red-500/20">
+              {errorMsg}
             </p>
+          )}
 
-            <div>
-              <label className="block text-zinc-400 text-sm mb-2 font-medium tracking-wide">CÓDIGO DE VERIFICACIÓN</label>
-              <input 
-                type="text" 
-                maxLength="6"
-                className="w-full bg-black/50 border border-zinc-800 rounded-lg p-3 text-white text-center text-2xl tracking-[0.5em] font-black focus:border-red-600 outline-none transition-all placeholder:text-zinc-700"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                placeholder="000000"
-                required
-              />
-            </div>
-
-            {errorMsg && (
-              <p className="text-red-500 text-[10px] font-black uppercase text-center tracking-widest bg-red-500/10 py-2 rounded border border-red-500/20">
-                {errorMsg}
-              </p>
-            )}
-
-            <button 
-              type="submit"
-              disabled={cargando}
-              className="w-full bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-black py-4 rounded-lg transition-all shadow-lg shadow-red-900/40 uppercase tracking-widest disabled:opacity-50"
-            >
-              {cargando ? 'Verificando...' : 'Verificar Código'}
-            </button>
-
-            <button 
-              type="button"
-              onClick={() => setStep('login')}
-              className="w-full text-zinc-500 hover:text-white text-xs uppercase tracking-widest transition-colors"
-            >
-              Volver al inicio de sesión
-            </button>
-          </form>
-        )}
+          <button 
+            type="submit"
+            disabled={cargando}
+            className="w-full bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-black py-4 rounded-lg transition-all shadow-lg shadow-red-900/40 uppercase tracking-widest disabled:opacity-50"
+          >
+            {cargando ? 'Verificando...' : 'Entrar al Estudio'}
+          </button>
+        </form>
       </div>
     </main>
   );
