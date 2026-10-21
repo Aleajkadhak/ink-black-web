@@ -1,10 +1,9 @@
 "use client";
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase'; // Importamos la conexión
-import { useRouter } from 'next/navigation'; // Para mandarte al Dashboard
+import { useRouter } from 'next/navigation';
 
 export default function Login() {
-  const [email, setEmail] = useState(''); // Supabase usa Email por defecto
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -16,18 +15,28 @@ export default function Login() {
     setCargando(true);
     setErrorMsg(null);
 
-    // Lógica real de Supabase Auth
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (error) {
-      setErrorMsg("Datos incorrectos o usuario no encontrado");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error || "Datos incorrectos");
+        setCargando(false);
+        return;
+      }
+
+      // Login exitoso
+      localStorage.setItem('token', data.token);
+      router.push('/'); // Cambia '/' por la ruta de tu dashboard si es diferente
+
+    } catch (error) {
+      setErrorMsg("Error de conexión con el servidor");
       setCargando(false);
-    } else {
-      console.log("Acceso concedido:", data.user.email);
-      router.push('/'); // Si entra bien, nos vamos al Dashboard
     }
   };
 
@@ -41,7 +50,9 @@ export default function Login() {
       <div className="relative w-full max-w-sm bg-zinc-900/90 border border-zinc-800 p-10 rounded-2xl shadow-2xl backdrop-blur-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black text-red-600 tracking-tighter italic">INK BLACK</h1>
-          <p className="text-zinc-500 text-xs uppercase tracking-widest mt-2 font-bold">Acceso al Sistema</p>
+          <p className="text-zinc-500 text-xs uppercase tracking-widest mt-2 font-bold">
+            Acceso al Sistema
+          </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">

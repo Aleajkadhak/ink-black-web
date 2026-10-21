@@ -1,14 +1,12 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { Zap, LayoutDashboard, Calendar, Box } from 'lucide-react';
+import { Zap, LayoutDashboard, Calendar, Box, LogOut } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NuevaSesion() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [productos, setProductos] = useState([]);
   
   const kitsDisponibles = ['Kit Estándar', 'Kit Micro', 'Kit Realismo'];
 
@@ -21,15 +19,18 @@ export default function NuevaSesion() {
   });
 
   useEffect(() => {
-    async function cargarInventario() {
-      const { data } = await supabase.from('productos').select('*');
-      if (data) setProductos(data);
+    // El cadenero: Validar sesión
+    if (!localStorage.getItem('token')) {
+      router.push('/login');
     }
-    cargarInventario();
-  }, []);
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    router.push('/login');
+  };
 
   const handleRegistrar = async () => {
-    // 1. Validaciones de campos vacíos
     if (!form.cliente || !form.fecha || !form.hora) {
       return alert("Por favor, completa Nombre, Fecha y Hora.");
     }
@@ -37,68 +38,24 @@ export default function NuevaSesion() {
     setLoading(true);
 
     try {
-      // 2. Obtener la receta del kit seleccionado
-      const { data: receta, error: errReceta } = await supabase
-        .from('kits_insumos')
-        .select('*')
-        .eq('nombre_kit', form.kit_nombre);
+      // Mandamos los datos a nuestra nueva API
+      const res = await fetch('/api/nueva-sesion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form)
+      });
 
-      if (errReceta) throw new Error("No se pudo cargar la receta del kit.");
+      const data = await res.json();
 
-      // 3. VALIDACIÓN DE STOCK: Revisar si hay suficiente material ANTES de agendar
-      if (receta && receta.length > 0) {
-        for (const item of receta) {
-          const productoEnAlmacen = productos.find(p => p.nombre === item.insumo_nombre);
-          
-          // Si el producto no existe en inventario o el stock es menor a lo que pide el kit
-          if (!productoEnAlmacen || productoEnAlmacen.stock_actual < item.cantidad_a_descontar) {
-            alert(`🚫 STOCK INSUFICIENTE: No hay suficiente "${item.insumo_nombre}" para el ${form.kit_nombre}.`);
-            setLoading(false);
-            return; // Detiene la ejecución por completo
-          }
-        }
+      if (!res.ok) {
+        throw new Error(data.error || "Hubo un problema al agendar.");
       }
-
-      // 4. DESCONTAR MATERIAL (Solo llega aquí si la validación anterior pasó)
-      if (receta && receta.length > 0) {
-        for (const item of receta) {
-          const productoEnAlmacen = productos.find(p => p.nombre === item.insumo_nombre);
-          
-          if (productoEnAlmacen) {
-            // Math.max asegura que por seguridad nunca baje de 0
-            const nuevoStock = Math.max(0, productoEnAlmacen.stock_actual - item.cantidad_a_descontar);
-            
-            const { error: errUpdate } = await supabase
-              .from('productos')
-              .update({ stock_actual: nuevoStock })
-              .eq('id', productoEnAlmacen.id);
-            
-            if (errUpdate) console.error(`Error descontando ${item.insumo_nombre}`);
-          }
-        }
-      }
-
-      // 5. INSERTAR LA CITA
-      const { error: errCita } = await supabase.from('citas').insert([
-        { 
-          cliente: form.cliente,
-          estilo: form.estilo,
-          fecha: form.fecha,
-          hora: form.hora,
-          artista: 'Alexandra',
-          estado: 'Confirmada',
-          kit_nombre: form.kit_nombre
-        }
-      ]);
-
-      if (errCita) throw errCita;
 
       alert("¡Sesión agendada y material descontado con éxito! 💉✨");
       router.push('/agenda');
 
     } catch (err) {
-      console.error(err);
-      alert("Hubo un error en el registro: " + err.message);
+      alert("🚫 " + err.message);
     } finally {
       setLoading(false);
     }
@@ -113,6 +70,7 @@ export default function NuevaSesion() {
           <div className="bg-red-600 w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shadow-lg shadow-red-900/40 text-white">IB</div>
           <h2 className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em] italic">Ink Black</h2>
         </div>
+        
         <nav className="space-y-1 flex-1">
           <Link href="/" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-900 text-zinc-500 font-bold text-xs transition-all">
             <LayoutDashboard size={16} /> Inicio
@@ -124,6 +82,10 @@ export default function NuevaSesion() {
             <Box size={16} /> Inventario
           </Link>
         </nav>
+
+        <button onClick={handleLogout} className="flex items-center gap-3 p-3 text-zinc-600 hover:text-red-500 font-black uppercase text-[9px] tracking-widest transition-all border-t border-zinc-900 pt-6">
+          <LogOut size={14} /> Cerrar Sesión
+        </button>
       </aside>
 
       {/* CONTENIDO PRINCIPAL */}
@@ -165,7 +127,7 @@ export default function NuevaSesion() {
                   <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">Fecha de Sesión</label>
                   <input 
                     type="date" 
-                    className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-bold text-zinc-400 outline-none" 
+                    className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-sm font-bold text-zinc-400 outline-none focus:text-white focus:border-red-600 transition-all" 
                     onChange={e => setForm({...form, fecha: e.target.value})} 
                   />
                 </div>
@@ -173,7 +135,7 @@ export default function NuevaSesion() {
                   <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest px-1">Hora de Inicio</label>
                   <input 
                     type="time" 
-                    className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-bold text-zinc-400 outline-none" 
+                    className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-sm font-bold text-zinc-400 outline-none focus:text-white focus:border-red-600 transition-all" 
                     onChange={e => setForm({...form, hora: e.target.value})} 
                   />
                 </div>
