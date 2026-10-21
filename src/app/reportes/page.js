@@ -49,7 +49,6 @@ export default function Reportes() {
   return (
     <div className="min-h-screen bg-black text-white flex font-sans">
       
-      {/* SIDEBAR */}
       <aside className="w-60 bg-zinc-950 border-r border-zinc-900 p-6 flex flex-col fixed h-full z-20">
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="bg-red-600 w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm text-white">IB</div>
